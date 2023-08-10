@@ -9,5 +9,4 @@ public class DataStaxOpolyApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(DataStaxOpolyApplication.class, args);
 	}
-
 }

@@ -1,0 +1,16 @@
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(0,'Advance to Bowers Ave.','MOVE',0,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(1,'Advance to Welles Mewes','MOVE',0,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(2,'Advance to Go!','MOVE',0,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(3,'Data Migration!  Pay $25 for each server instance, $100 for each database.','CHARGE',0,'Compute $25x number of server instances and $100x number of databases');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(4,'Private stock dividend!','CREDIT',50,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(5,'Take a ride on the Milpitas BART!','MOVE',0,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(6,'Advance to nearest BART station.  Pay the owner 2x the normal charges.','MOVE',0,'Go to nearest BART; compute charges at 2x');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(7,'Elected Chair of the PMC! Pay each player $50.','CHARGE',0,'Compute $50x number of players, max of $500');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(8,'Advance to Luther Ln.','MOVE',0,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(9,'Pay California Healthcare tax of $15','CHARGE',15,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(10,'Advance to nearest cloud provider.  Pay the owner 10x the normal charges.','MOVE',0,'Go to nearest cloud provider; compute charges at 10x');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(11,'Get out of social media jail, free!','HOLD',0,'');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(12,'Go directly to social media jail!','MOVE',0,'Go to jail; imprisoned!');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(13,'Advance to nearest BART station.  Pay the owner 2x the normal charges.','MOVE',0,'Go to nearest BART; compute charges at 2x');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(14,'Go back 3 spaces','MOVE',0,'back 3 spaces');
+INSERT INTO swag_cards (card_id,name,type,value,special) VALUES(15,'Public stock sale!  Collect $150','CREDIT',150,'');
