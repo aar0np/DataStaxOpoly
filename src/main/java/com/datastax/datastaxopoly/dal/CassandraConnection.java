@@ -2,8 +2,6 @@ package com.datastax.datastaxopoly.dal;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import com.datastax.oss.driver.api.core.CqlSession;

@@ -12,6 +12,8 @@ public class Square {
 	private int rentDatabase;
 	private int mortgage;
 	private int structureCost;
+	private int centerX;
+	private int centerY;
 	private String special;
 
 	public int getSquareId() {
@@ -85,7 +87,23 @@ public class Square {
 	public void setStructureCost(int structureCost) {
 		this.structureCost = structureCost;
 	}
+
+	public int getCenterX() {
+		return centerX;
+	}
 	
+	public void setCenterX(int centerX) {
+		this.centerX = centerX;
+	}
+
+	public int getCenterY() {
+		return centerY;
+	}
+	
+	public void setCenterY(int centerY) {
+		this.centerY = centerY;
+	}
+
 	public String getSpecial() {
 		return special;
 	}

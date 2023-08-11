@@ -2,6 +2,7 @@ package com.datastax.datastaxopoly.dal;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -16,7 +17,7 @@ import com.datastax.oss.driver.api.core.cql.Row;
 public class GameDAL {
 
 	private CqlSession session;
-	private UUID empty;
+	//private final UUID empty = UUID.fromString("00000000-0000-0000-0000-000000000000");
 	
 	private PreparedStatement squareByIdPrepared;
 	private PreparedStatement communityCardByIdPrepared;
@@ -25,15 +26,24 @@ public class GameDAL {
 	private PreparedStatement playerByIdPrepared;
 	private PreparedStatement playersByGamePrepared;
 	private PreparedStatement jailOccupantsByGameIdPrepared;
+	private PreparedStatement gameByIdPrepared;
+	private PreparedStatement newGamePrepared;
+	private PreparedStatement loginPrepared;
+	private PreparedStatement newLoginPrepared;
+	private PreparedStatement addPlayerPrepared;
+	private PreparedStatement insertBoardPlayerPrepared;
+	private PreparedStatement updateBoardPlayerPrepared;
+	private PreparedStatement playersOnBoardPrepared;
+	private PreparedStatement playerOnBoardPrepared;
+	private PreparedStatement playersInGamePrepared;
 	
 	public GameDAL() {
 		this.session = new CassandraConnection().getCqlSession();
-		
-		empty = UUID.fromString("00000000-0000-0000-0000-000000000000");
 		prepareStatements();
 	}
 	
 	private void prepareStatements() {
+		
 		String squareByIdCQL = "SELECT * FROM squares WHERE square_id = ?";
 		String communityCardByIdCQL = "SELECT * FROM community_cards WHERe card_id = ?";
 		String swagCardByIdCQL = "SELECT * FROm swag_cards WHERE card_id = ?";
@@ -41,6 +51,16 @@ public class GameDAL {
 		String playerByIdCQL = "SELECT * FROM players WHERE game_id = ? AND player_id = ?";
 		String playersByGameCQL = "SELECT * FROM players WHERE game_id = ?";
 		String jailOccupantsByGameIdCQL = "SELECT * FROM jail WHERE game_id = ?";
+		String gamesByIdCQL = "SELECT * FROM games WHERE month_bucket = ? AND game_id = ?";
+		String newGameCQL = "INSERT INTO games (game_id,month_bucket,game_name,active,accepting_players) VALUES (?,?,?,true,true)";
+		String loginCQL = "SELECT * FROM player_login WHERE player_name = ?";
+		String newLoginCQL = "INSERT INTO player_login (player_id, player_name, password) VALUES (?,?,?)";
+		String addPlayerCQL = "INSERT INTO players (game_id,player_id,name,cash,token_id,token_color) VALUES(?,?,?,?,?,?)";
+		String insertPlayerBoardCQL = "INSERT INTO board (game_id,player_id,square_id,token_id,token_color,offset_x,offset_y) VALUES (?,?,?,?,?,?,?)";
+		String updatePlayerBoardCQL = "INSERT INTO board (game_id,player_id,square_id) VALUES (?,?,?)";
+		String playersOnBoardCQL = "SELECT * FROM board WHERE game_id = ?";
+		String playerOnBoardCQL = "SELECT * FROM board WHERE game_id = ? AND player_id = ?";
+		String playersInGameCQL = "SELECT COUNT(*) FROM board WHERE game_id = ?";
 		
 		squareByIdPrepared = session.prepare(squareByIdCQL);
 		communityCardByIdPrepared = session.prepare(communityCardByIdCQL);
@@ -49,6 +69,16 @@ public class GameDAL {
 		playerByIdPrepared = session.prepare(playerByIdCQL);
 		playersByGamePrepared = session.prepare(playersByGameCQL);
 		jailOccupantsByGameIdPrepared = session.prepare(jailOccupantsByGameIdCQL);
+		gameByIdPrepared = session.prepare(gamesByIdCQL);
+		newGamePrepared = session.prepare(newGameCQL);
+		loginPrepared = session.prepare(loginCQL);
+		newLoginPrepared = session.prepare(newLoginCQL);
+		addPlayerPrepared = session.prepare(addPlayerCQL);
+		insertBoardPlayerPrepared = session.prepare(insertPlayerBoardCQL);
+		updateBoardPlayerPrepared = session.prepare(updatePlayerBoardCQL);
+		playersOnBoardPrepared = session.prepare(playersOnBoardCQL);
+		playerOnBoardPrepared = session.prepare(playerOnBoardCQL);
+		playersInGamePrepared = session.prepare(playersInGameCQL);
 	}
 	
 	private void processNewPropertyInserts(BufferedReader fileReader, UUID gameId) {
@@ -86,42 +116,52 @@ public class GameDAL {
 		}
 	}
 	
-	public UUID newGame() {
+	public UUID newGame(String name, int monthBucket) {
 		UUID gameId = UUID.randomUUID();
 		
 		// add bank as a player
-		session.execute("INSERT INTO players (game_id, name, player_id)"
-				+ "VALUES (" + gameId + ",'Bank'," + empty + ")");
+		//session.execute("INSERT INTO players (game_id, name, player_id)"
+		//		+ "VALUES (" + gameId + ",'Bank'," + empty + ")");
 		
 		try {
-			BufferedReader propertyReader = new BufferedReader(new FileReader("/resources/data/initializeOwnership.cql"));
+			BufferedReader propertyReader = new BufferedReader(new FileReader("src/main/resources/data/initializeOwnership.cql"));
 			processNewPropertyInserts(propertyReader, gameId);
 			
 			Row commCardCount = session.execute("SELECT count(*) FROM community_cards").one();
 			
-			if (commCardCount != null && commCardCount.getInt("count") != 16) {
-				BufferedReader communityCardReader = new BufferedReader(new FileReader("/resources/data/communityCards.cql"));
+			if (commCardCount != null && commCardCount.getLong("count") != 16) {
+				BufferedReader communityCardReader = new BufferedReader(new FileReader("src/main/resources/data/communityCards.cql"));
 				processNewInserts(communityCardReader);				
 			}
 
 			Row swagCardCount = session.execute("SELECT count(*) FROM swag_cards").one();
 
-			if (swagCardCount != null && swagCardCount.getInt("count") != 16) {
-				BufferedReader swagCardReader = new BufferedReader(new FileReader("/resources/data/swagCards.cql"));
+			if (swagCardCount != null && swagCardCount.getLong("count") != 16) {
+				BufferedReader swagCardReader = new BufferedReader(new FileReader("src/main/resources/data/swagCards.cql"));
 				processNewInserts(swagCardReader);				
 			}
 			
 			Row squareCount = session.execute("SELECT count(*) FROM squares").one();
 			
-			if (squareCount != null && squareCount.getInt("count") != 40) {
-				BufferedReader squareDataReader = new BufferedReader(new FileReader("/resources/data/squares.cql"));
+			if (squareCount != null && squareCount.getLong("count") != 40) {
+				BufferedReader squareDataReader = new BufferedReader(new FileReader("src/main/resources/data/squares.cql"));
 				processNewInserts(squareDataReader);
 			}
-		
+
+			Row tokenCount = session.execute("SELECT count(*) FROM tokens").one();
+			
+			if (tokenCount != null && squareCount.getLong("count") < 8) {
+				BufferedReader squareDataReader = new BufferedReader(new FileReader("src/main/resources/data/tokens.cql"));
+				processNewInserts(squareDataReader);
+			}
+			
+			BoundStatement newGame = newGamePrepared.bind(gameId, monthBucket, name);
+			session.execute(newGame);
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+				
 		return gameId;
 	}
 	
@@ -150,7 +190,7 @@ public class GameDAL {
 			return Optional.of(returnVal);
 		}
 		
-		return Optional.of(null);
+		return Optional.ofNullable(null);
 	}
 	
 	public Optional<List<Player>> getPlayers(UUID gameId) {
@@ -203,7 +243,7 @@ public class GameDAL {
 			return Optional.of(returnVal);
 		}
 		
-		return Optional.of(null);
+		return Optional.ofNullable(null);
 	}
 	
 	public Optional<Square> getSquare(int squareId) {
@@ -231,7 +271,7 @@ public class GameDAL {
 			return Optional.of(returnVal);
 		}
 		
-		return Optional.of(null);
+		return Optional.ofNullable(null);
 	}
 	
 	public Optional<Card> getCommunityCard(int cardId) {
@@ -253,7 +293,7 @@ public class GameDAL {
 			return Optional.of(returnVal);
 		}
 		
-		return Optional.of(null);
+		return Optional.ofNullable(null);
 	}
 	
 	public Optional<Card> getSwagCard(int cardId) {
@@ -275,7 +315,7 @@ public class GameDAL {
 			return Optional.of(returnVal);
 		}
 		
-		return Optional.of(null);
+		return Optional.ofNullable(null);
 	}
 	
 	public Optional<Token> getToken(int tokenId) {
@@ -295,6 +335,162 @@ public class GameDAL {
 			return Optional.of(returnVal);
 		}
 		
-		return Optional.of(null);
+		return Optional.ofNullable(null);
+	}
+	
+	public Optional<Game> getGame(UUID gameId, int monthBucket) {
+		
+		BoundStatement getGame = gameByIdPrepared.bind(monthBucket,gameId);
+		ResultSet rSet = session.execute(getGame);
+		
+		Row gameData = rSet.one();
+		
+		if (gameData != null) {
+			Game returnVal = new Game();
+			
+			returnVal.setGameId(gameId);
+			returnVal.setName(gameData.getString("game_name"));
+			returnVal.setActive(gameData.getBoolean("active"));
+			returnVal.setAcceptingPlayers(gameData.getBoolean("accepting_players"));
+			
+			return Optional.of(returnVal);
+		}
+		
+		return Optional.ofNullable(null);
+	}
+
+	public Optional<List<Game>> getGames(int monthBucket) {
+
+		ResultSet rSet = session.execute("SELECT * FROM games WHERE month_bucket = "
+		+ monthBucket);
+		
+		List<Row> gamesData = rSet.all();
+		
+		if (gamesData != null) {
+			List<Game> returnVal = new ArrayList<>();
+			
+			for (Row gameRow : gamesData) {
+				Game game = new Game();
+				
+				game.setGameId(gameRow.getUuid("game_id"));
+				game.setName(gameRow.getString("game_name"));
+				game.setActive(gameRow.getBoolean("active"));
+				game.setAcceptingPlayers(gameRow.getBoolean("accepting_players"));
+				
+				returnVal.add(game);
+			}
+			
+			return Optional.of(returnVal);
+		}
+		
+		return Optional.ofNullable(null);
+	}
+	
+	public Optional<Player> login(String username) {
+		BoundStatement getLogin = loginPrepared.bind(username);
+		ResultSet rSet = session.execute(getLogin);
+		
+		Row loginData = rSet.one();
+		Player returnVal = new Player();
+		
+		if (loginData != null) {
+			
+			returnVal.setName(username);
+			returnVal.setPlayerId(loginData.getUuid("player_id"));
+			returnVal.setPassword(loginData.getString("password"));
+			
+			return Optional.of(returnVal);
+		}
+		
+		return Optional.ofNullable(null);
+	}
+	
+	public void newUser(Player player) {
+				
+		BoundStatement postLogin = newLoginPrepared.bind(
+				player.getPlayerId(), player.getName(), player.getPassword());
+		session.execute(postLogin);
+	}
+	
+	public void addNewPlayer(UUID gameId, UUID playerId, String playerName,
+			int tokenId, String tokenColor) {
+		
+		// INSERT INTO players (game_id,player_id,name,cash,token_id,token_color)
+		BoundStatement playerStatement = addPlayerPrepared.bind(
+				gameId, playerId, playerName, 1500, tokenId, tokenColor);
+		session.execute(playerStatement);
+	}
+	
+	public void addNewPlayerBoard(UUID gameId, UUID playerId,
+			int tokenId, String tokenColor,
+			int offsetX, int offsetY) {
+		// INSERT INTO board (game_id,player_id,square_id,token_id,token_color)
+		BoundStatement boardStatement = insertBoardPlayerPrepared.bind(
+				gameId, playerId, 0, tokenId, tokenColor);
+		session.execute(boardStatement);
+	}
+	
+	public void updatePlayerBoard(UUID gameId, UUID playerId, int squareId) {
+		
+		BoundStatement boardStatement = updateBoardPlayerPrepared.bind(
+				gameId, playerId, squareId);
+		session.execute(boardStatement);
+	}
+	
+	public Optional<List<BoardPlayer>> getBoardPlayers(UUID gameId) {
+		
+		BoundStatement boardPlayersStatement = playerOnBoardPrepared.bind(
+				gameId);
+		List<Row> rows = session.execute(boardPlayersStatement).all();
+		List<BoardPlayer> returnVal = new ArrayList<>();
+		
+		if (rows != null) {
+			for (Row row : rows) {
+				BoardPlayer player = new BoardPlayer();
+				player.setGameId(gameId);
+				player.setPlayerId(row.getUuid("player_id"));
+				player.setOffsetX(row.getInt("offset_x"));
+				player.setOffsetY(row.getInt("offset_y"));
+				player.setSquareId(row.getInt("sqaure_id"));
+				player.setTokenColor(row.getString("token_color"));
+				player.setTokenId(row.getInt("token_id"));
+				
+				returnVal.add(player);
+			}
+		}
+		
+		return Optional.of(returnVal);
+	}
+	
+	public Optional<BoardPlayer> getBoardPlayer(UUID gameId, UUID playerId) {
+		
+		BoundStatement boardPlayerStatement = playerOnBoardPrepared.bind(
+				gameId, playerId);
+		Row row = session.execute(boardPlayerStatement).one();
+		
+		if (row != null) {
+			BoardPlayer player = new BoardPlayer();
+			player.setGameId(gameId);
+			player.setPlayerId(playerId);
+			player.setOffsetX(row.getInt("offset_x"));
+			player.setOffsetY(row.getInt("offset_y"));
+			player.setSquareId(row.getInt("sqaure_id"));
+			player.setTokenColor(row.getString("token_color"));
+			player.setTokenId(row.getInt("token_id"));
+		}
+		
+		return Optional.ofNullable(null);
+	}
+	
+	public Long getBoardPlayersCount(UUID gameId) {
+		
+		BoundStatement countBoardPlayers = playersInGamePrepared.bind(gameId);
+		Row row = session.execute(countBoardPlayers).one();
+		
+		if (row != null) {
+			return row.getLong("count");
+		}
+		
+		return 0L;
 	}
 }

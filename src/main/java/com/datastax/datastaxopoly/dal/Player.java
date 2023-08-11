@@ -8,8 +8,10 @@ public class Player {
 	private UUID gameId;
 	private UUID playerId;
 	private String name;
+	private String password;
 	private int cash;
 	private int tokenId;
+	private String tokenColor;
 	private Map<String,Integer> getOutOfJailCards;
 	
 	public UUID getGameId() {
@@ -35,7 +37,15 @@ public class Player {
 	public void setName(String name) {
 		this.name = name;
 	}
+
+	public String getPassword() {
+		return password;
+	}
 	
+	public void setPassword(String password) {
+		this.password = password;
+	}
+
 	public int getCash() {
 		return cash;
 	}
@@ -50,6 +60,14 @@ public class Player {
 	
 	public void setTokenId(int tokenId) {
 		this.tokenId = tokenId;
+	}
+	
+	public String getTokenColor() {
+		return tokenColor;
+	}
+	
+	public void setTokenColor(String tokenColor) {
+		this.tokenColor = tokenColor;
 	}
 	
 	public Map<String, Integer> getGetOutOfJailCards() {
