@@ -4,11 +4,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
+import com.datastax.datastaxopoly.dal.BoardPlayer;
 import com.datastax.datastaxopoly.dal.Square;
+
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.icon.Icon;
@@ -36,6 +40,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 	
 	private UUID playerId;
 	private UUID gameId;
+	private Grid<String> playerGrid = new Grid<>();
 	
 	public DataStaxOpolyBoard() {
 
@@ -46,6 +51,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		
 		setSpacing(false);
 		add(buildBoard());
+		add(playerGrid);
 		
 		//add(buildTopOfBoard());
 		
@@ -62,8 +68,6 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		//token.getStyle().setLeft("570px");
 		//token.getStyle().setTop("570px");
 		//addComponentAtIndex(0, token);
-
-		
 		
 	}
 	
@@ -76,7 +80,9 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
     		String[] gamePlayerArray = gameAndPlayerIds.split(",");
     		
     		this.gameId = UUID.fromString(gamePlayerArray[0]);
-    		this.playerId = UUID.fromString(gamePlayerArray[1]);
+    		this.playerId = UUID.fromString(gamePlayerArray[1]);    		
+    		drawTokens();
+    		buildPlayerGrid();
     	}
     }
 	
@@ -172,4 +178,85 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 //		
 //		return layout;
 //	}
+	
+	private void buildPlayerGrid() {
+		Optional<List<BoardPlayer>> players = serviceLayer.getBoardPlayers(gameId);
+		
+		if (players.isPresent()) {
+
+			for (BoardPlayer player : players.get()) {
+
+				Icon token = getToken(player.getTokenId());
+				token.setColor(player.getTokenColor());
+
+			}
+		}
+	}
+	
+	private Component drawTokens() {
+		HorizontalLayout layout = new HorizontalLayout();
+		
+		Optional<List<BoardPlayer>> players = serviceLayer.getBoardPlayers(gameId);
+		
+		if (players.isPresent()) {
+
+			int ordinal = 0;
+			for (BoardPlayer player : players.get()) {
+				Square square = serviceLayer.getSquare(player.getSquareId());
+				
+				int absoluteX = square.getCenterX() + player.getOffsetX();
+				int absoluteY = square.getCenterY() + player.getOffsetY();
+				
+				Icon token = getToken(player.getTokenId());
+				token.setColor(player.getTokenColor());
+				token.getStyle().setPosition(Position.ABSOLUTE);
+				token.getStyle().setLeft(absoluteX + "px");
+				token.getStyle().setTop(absoluteY + "px");
+				addComponentAtIndex(ordinal, token);
+				
+				ordinal++;
+			}
+		}
+		
+		return layout;
+	}
+	
+	private Icon getToken(int tokenIndex) {
+		
+		Icon token;
+		//Icon token = new Icon(VaadinIcon.AIRPLANE);
+		//token.setColor("blue");
+		//token.getStyle().setPosition(Position.ABSOLUTE);
+		//token.getStyle().setLeft("570px");
+		//token.getStyle().setTop("570px");
+		//addComponentAtIndex(0, token);
+		
+		switch (tokenIndex) {
+		case 0:
+			token = new Icon(VaadinIcon.WRENCH);
+			break;
+		case 1:
+			token = new Icon(VaadinIcon.SWORD);
+			break;
+		case 2:
+			token = new Icon(VaadinIcon.AIRPLANE);
+			break;
+		case 3:
+			token = new Icon(VaadinIcon.SUITCASE);
+			break;
+		case 4:
+			token = new Icon(VaadinIcon.STAR);
+			break;
+		case 5:
+			token = new Icon(VaadinIcon.ROCKET);
+			break;
+		case 6:
+			token = new Icon(VaadinIcon.PIN);
+			break;
+		default:
+			token = new Icon(VaadinIcon.SCISSORS);
+		}
+		
+		return token;
+	}
 }

@@ -141,6 +141,10 @@ public class DataStaxOpolyController {
 		return Optional.ofNullable(null);
 	}
 	
+	public Optional<List<BoardPlayer>> getBoardPlayers(UUID gameId) {
+		return dataLayer.getBoardPlayers(gameId);
+	}
+	
 	public void addPlayerToGame(UUID playerId, String playerName, UUID gameId) {
 		// initialize player
 		int tokenId = random.nextInt(8);

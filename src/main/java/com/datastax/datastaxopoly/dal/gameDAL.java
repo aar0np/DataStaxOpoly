@@ -267,6 +267,8 @@ public class GameDAL {
 			returnVal.setSpecial(squareData.getString("special"));
 			returnVal.setStructureCost(squareData.getInt("structure_cost"));
 			returnVal.setType(squareData.getString("type"));
+			returnVal.setCenterX(squareData.getInt("center_x"));
+			returnVal.setCenterY(squareData.getInt("center_y"));
 			
 			return Optional.of(returnVal);
 		}
@@ -439,9 +441,10 @@ public class GameDAL {
 	
 	public Optional<List<BoardPlayer>> getBoardPlayers(UUID gameId) {
 		
-		BoundStatement boardPlayersStatement = playerOnBoardPrepared.bind(
+		BoundStatement boardPlayersStatement = playersOnBoardPrepared.bind(
 				gameId);
 		List<Row> rows = session.execute(boardPlayersStatement).all();
+		
 		List<BoardPlayer> returnVal = new ArrayList<>();
 		
 		if (rows != null) {
@@ -451,7 +454,7 @@ public class GameDAL {
 				player.setPlayerId(row.getUuid("player_id"));
 				player.setOffsetX(row.getInt("offset_x"));
 				player.setOffsetY(row.getInt("offset_y"));
-				player.setSquareId(row.getInt("sqaure_id"));
+				player.setSquareId(row.getInt("square_id"));
 				player.setTokenColor(row.getString("token_color"));
 				player.setTokenId(row.getInt("token_id"));
 				
