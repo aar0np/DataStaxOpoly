@@ -2,7 +2,6 @@ package com.datastax.datastaxopoly.dal;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -31,11 +30,10 @@ public class GameDAL {
 	private PreparedStatement loginPrepared;
 	private PreparedStatement newLoginPrepared;
 	private PreparedStatement addPlayerPrepared;
-	private PreparedStatement insertBoardPlayerPrepared;
-	private PreparedStatement updateBoardPlayerPrepared;
-	private PreparedStatement playersOnBoardPrepared;
-	private PreparedStatement playerOnBoardPrepared;
-	private PreparedStatement playersInGamePrepared;
+	private PreparedStatement updateCashPrepared;
+	private PreparedStatement getGamePropertyPrepared;
+	private PreparedStatement updatePropertyOwnerCQLPrepared;
+	private PreparedStatement updatePlayerSpacePrepared;
 	
 	public GameDAL() {
 		this.session = new CassandraConnection().getCqlSession();
@@ -51,16 +49,15 @@ public class GameDAL {
 		String playerByIdCQL = "SELECT * FROM players WHERE game_id = ? AND player_id = ?";
 		String playersByGameCQL = "SELECT * FROM players WHERE game_id = ?";
 		String jailOccupantsByGameIdCQL = "SELECT * FROM jail WHERE game_id = ?";
-		String gamesByIdCQL = "SELECT * FROM games WHERE month_bucket = ? AND game_id = ?";
-		String newGameCQL = "INSERT INTO games (game_id,month_bucket,game_name,active,accepting_players) VALUES (?,?,?,true,true)";
+		String gamesByIdCQL = "SELECT * FROM games WHERE game_id = ?";
+		String newGameCQL = "INSERT INTO games (game_id,game_name,active,accepting_players) VALUES (?,?,true,true)";
 		String loginCQL = "SELECT * FROM player_login WHERE player_name = ?";
 		String newLoginCQL = "INSERT INTO player_login (player_id, player_name, password) VALUES (?,?,?)";
-		String addPlayerCQL = "INSERT INTO players (game_id,player_id,name,cash,token_id,token_color) VALUES(?,?,?,?,?,?)";
-		String insertPlayerBoardCQL = "INSERT INTO board (game_id,player_id,square_id,token_id,token_color,offset_x,offset_y) VALUES (?,?,?,?,?,?,?)";
-		String updatePlayerBoardCQL = "INSERT INTO board (game_id,player_id,square_id) VALUES (?,?,?)";
-		String playersOnBoardCQL = "SELECT * FROM board WHERE game_id = ?";
-		String playerOnBoardCQL = "SELECT * FROM board WHERE game_id = ? AND player_id = ?";
-		String playersInGameCQL = "SELECT COUNT(*) FROM board WHERE game_id = ?";
+		String addPlayerCQL = "INSERT INTO players (game_id,player_id,name,cash,token_id) VALUES(?,?,?,?,?)";
+		String updateCashCQL = "UPDATE players SET cash = ? WHERE game_id = ? AND player_id = ?";
+		String getGamePropertyCQL = "SELECT * FROM properties_by_player WHERE game_id = ? AND square_id = ?";
+		String updatePropertyOwnerCQL = "INSERT INTO properties_by_player (game_id,square_id,player_id) VALUES (?,?,?)";
+		String updatePlayerSpace = "INSERT INTO players (game_id,player_id,square_id) VALUES (?,?,?)";
 		
 		squareByIdPrepared = session.prepare(squareByIdCQL);
 		communityCardByIdPrepared = session.prepare(communityCardByIdCQL);
@@ -74,17 +71,15 @@ public class GameDAL {
 		loginPrepared = session.prepare(loginCQL);
 		newLoginPrepared = session.prepare(newLoginCQL);
 		addPlayerPrepared = session.prepare(addPlayerCQL);
-		insertBoardPlayerPrepared = session.prepare(insertPlayerBoardCQL);
-		updateBoardPlayerPrepared = session.prepare(updatePlayerBoardCQL);
-		playersOnBoardPrepared = session.prepare(playersOnBoardCQL);
-		playerOnBoardPrepared = session.prepare(playerOnBoardCQL);
-		playersInGamePrepared = session.prepare(playersInGameCQL);
+		updateCashPrepared = session.prepare(updateCashCQL);
+		getGamePropertyPrepared = session.prepare(getGamePropertyCQL);
+		updatePropertyOwnerCQLPrepared = session.prepare(updatePropertyOwnerCQL);
+		updatePlayerSpacePrepared = session.prepare(updatePlayerSpace);
 	}
 	
 	private void processNewPropertyInserts(BufferedReader fileReader, UUID gameId) {
 		
 		try {
-			
 			String cqlInsert = fileReader.readLine();
 			
 			while (cqlInsert != null) {
@@ -116,7 +111,7 @@ public class GameDAL {
 		}
 	}
 	
-	public UUID newGame(String name, int monthBucket) {
+	public UUID newGame(String name) {
 		UUID gameId = UUID.randomUUID();
 		
 		// add bank as a player
@@ -155,7 +150,7 @@ public class GameDAL {
 				processNewInserts(squareDataReader);
 			}
 			
-			BoundStatement newGame = newGamePrepared.bind(gameId, monthBucket, name);
+			BoundStatement newGame = newGamePrepared.bind(gameId, name);
 			session.execute(newGame);
 
 		} catch (Exception e) {
@@ -213,6 +208,7 @@ public class GameDAL {
 						"get_out_of_jail_cards", String.class, Integer.class));
 				player.setName(playerRow.getString("name"));
 				player.setTokenId(playerRow.getInt("token_id"));
+				player.setSquareId(playerRow.getInt("square_id"));
 				
 				returnVal.add(player);
 			}
@@ -239,6 +235,7 @@ public class GameDAL {
 					"get_out_of_jail_cards", String.class, Integer.class));
 			returnVal.setName(playerData.getString("name"));
 			returnVal.setTokenId(playerData.getInt("token_id"));
+			returnVal.setSquareId(playerData.getInt("square_id"));
 			
 			return Optional.of(returnVal);
 		}
@@ -340,9 +337,9 @@ public class GameDAL {
 		return Optional.ofNullable(null);
 	}
 	
-	public Optional<Game> getGame(UUID gameId, int monthBucket) {
+	public Optional<Game> getGame(UUID gameId) {
 		
-		BoundStatement getGame = gameByIdPrepared.bind(monthBucket,gameId);
+		BoundStatement getGame = gameByIdPrepared.bind(gameId);
 		ResultSet rSet = session.execute(getGame);
 		
 		Row gameData = rSet.one();
@@ -361,10 +358,9 @@ public class GameDAL {
 		return Optional.ofNullable(null);
 	}
 
-	public Optional<List<Game>> getGames(int monthBucket) {
+	public Optional<List<Game>> getGames() {
 
-		ResultSet rSet = session.execute("SELECT * FROM games WHERE month_bucket = "
-		+ monthBucket);
+		ResultSet rSet = session.execute("SELECT * FROM games");
 		
 		List<Row> gamesData = rSet.all();
 		
@@ -415,85 +411,69 @@ public class GameDAL {
 	}
 	
 	public void addNewPlayer(UUID gameId, UUID playerId, String playerName,
-			int tokenId, String tokenColor) {
+			int tokenId) {
 		
 		// INSERT INTO players (game_id,player_id,name,cash,token_id,token_color)
 		BoundStatement playerStatement = addPlayerPrepared.bind(
-				gameId, playerId, playerName, 1500, tokenId, tokenColor);
+				gameId, playerId, playerName, 1500, tokenId);
 		session.execute(playerStatement);
 	}
 	
-	public void addNewPlayerBoard(UUID gameId, UUID playerId,
-			int tokenId, String tokenColor,
-			int offsetX, int offsetY) {
-		// INSERT INTO board (game_id,player_id,square_id,token_id,token_color)
-		BoundStatement boardStatement = insertBoardPlayerPrepared.bind(
-				gameId, playerId, 0, tokenId, tokenColor);
-		session.execute(boardStatement);
+	public void closeGame(UUID gameId) {
+		
+		String closeGameCQL = "UPDATE games SET accepting_players = false WHERE game_id = ?";
+		BoundStatement closeGameStatement = session.prepare(closeGameCQL).bind(gameId);
+		
+		session.execute(closeGameStatement);
 	}
 	
-	public void updatePlayerBoard(UUID gameId, UUID playerId, int squareId) {
+	public void updatePlayerBalance(UUID gameId, UUID playerId, int amount) {
 		
-		BoundStatement boardStatement = updateBoardPlayerPrepared.bind(
-				gameId, playerId, squareId);
-		session.execute(boardStatement);
+		BoundStatement payBank = updateCashPrepared.bind(amount, gameId, playerId);
+		session.execute(payBank);
 	}
 	
-	public Optional<List<BoardPlayer>> getBoardPlayers(UUID gameId) {
+	public Optional<Property> getGameProperty(UUID gameId, int squareId) {
 		
-		BoundStatement boardPlayersStatement = playersOnBoardPrepared.bind(
-				gameId);
-		List<Row> rows = session.execute(boardPlayersStatement).all();
+		BoundStatement getProperty = getGamePropertyPrepared.bind(gameId, squareId);
+		ResultSet rSet = session.execute(getProperty);
 		
-		List<BoardPlayer> returnVal = new ArrayList<>();
+		Row propertyData = rSet.one();
 		
-		if (rows != null) {
-			for (Row row : rows) {
-				BoardPlayer player = new BoardPlayer();
-				player.setGameId(gameId);
-				player.setPlayerId(row.getUuid("player_id"));
-				player.setOffsetX(row.getInt("offset_x"));
-				player.setOffsetY(row.getInt("offset_y"));
-				player.setSquareId(row.getInt("square_id"));
-				player.setTokenColor(row.getString("token_color"));
-				player.setTokenId(row.getInt("token_id"));
-				
-				returnVal.add(player);
-			}
-		}
-		
-		return Optional.of(returnVal);
-	}
-	
-	public Optional<BoardPlayer> getBoardPlayer(UUID gameId, UUID playerId) {
-		
-		BoundStatement boardPlayerStatement = playerOnBoardPrepared.bind(
-				gameId, playerId);
-		Row row = session.execute(boardPlayerStatement).one();
-		
-		if (row != null) {
-			BoardPlayer player = new BoardPlayer();
-			player.setGameId(gameId);
-			player.setPlayerId(playerId);
-			player.setOffsetX(row.getInt("offset_x"));
-			player.setOffsetY(row.getInt("offset_y"));
-			player.setSquareId(row.getInt("sqaure_id"));
-			player.setTokenColor(row.getString("token_color"));
-			player.setTokenId(row.getInt("token_id"));
+		if (propertyData != null) {
+			Property returnVal = new Property();
+			
+			returnVal.setGameId(gameId);
+			returnVal.setSquare_id(squareId);
+			returnVal.setName(propertyData.getString("name"));
+			returnVal.setImage(propertyData.getString("image"));
+			returnVal.setMortgage(propertyData.getInt("mortgage"));
+			returnVal.setPrice(propertyData.getInt("price"));
+			returnVal.setPlayer_id(propertyData.getUuid("player_id"));
+			returnVal.setSpecial(propertyData.getString("special"));
+			returnVal.setType(propertyData.getString("type"));
+			returnVal.setRent(propertyData.getList("rent", Integer.class));
+			returnVal.setRentDatabase(propertyData.getInt("rent_database"));
+			
+			return Optional.ofNullable(returnVal);
 		}
 		
 		return Optional.ofNullable(null);
 	}
 	
-	public Long getBoardPlayersCount(UUID gameId) {
+	public void updatePropertyOwner(UUID gameId, int squareId, UUID playerId) {
 		
-		BoundStatement countBoardPlayers = playersInGamePrepared.bind(gameId);
-		Row row = session.execute(countBoardPlayers).one();
+		BoundStatement updateOwnerStatement = updatePropertyOwnerCQLPrepared.bind(
+				gameId, squareId, playerId);
 		
-		if (row != null) {
-			return row.getLong("count");
-		}
+		session.execute(updateOwnerStatement);
+	}
+	
+	public void updatePlayerSpace(UUID gameId, UUID playerId, int squareId) {
 		
-		return 0L;
+		BoundStatement updatePlayerSpaceStatement = updatePlayerSpacePrepared.bind(
+				gameId, playerId, squareId);
+		
+		session.execute(updatePlayerSpaceStatement);
 	}
 }

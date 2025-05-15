@@ -11,6 +11,7 @@ public class Player {
 	private String password;
 	private int cash;
 	private int tokenId;
+	private int squareId;
 	private String tokenColor;
 	private Map<String,Integer> getOutOfJailCards;
 	
@@ -76,5 +77,13 @@ public class Player {
 	
 	public void setGetOutOfJailCards(Map<String, Integer> getOutOfJailCards) {
 		this.getOutOfJailCards = getOutOfJailCards;
+	}
+	
+	public int getSquareId() {
+		return squareId;
+	}
+	
+	public void setSquareId(int squareId) {
+		this.squareId = squareId;
 	}
 }

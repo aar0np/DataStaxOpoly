@@ -29,7 +29,7 @@ VALUES(13,'','cloudprovider1.png',128,'CLOUDPROVIDER',[5,10],0,0,0,30,402,'canno
 INSERT INTO squares (square_id,name,image,price,type,rent,rent_database,mortgage,structure_cost,center_x,center_y,special)
 VALUES(14,'Wells St.','wellsst.png',134,'CYAN',[12,60,180,500,700],900,67,100,30,351,'');
 INSERT INTO squares (square_id,name,image,price,type,rent,rent_database,mortgage,structure_cost,center_x,center_y,special)
-VALUES(15,'Lake Merritt BART','lakemerittBART.png',200,'BART',[0,50,100,150,200],0,100,0,30,300,'cannot build');
+VALUES(15,'Lake Merritt BART','lakemerrittBART.png',200,'BART',[0,50,100,150,200],0,100,0,30,300,'cannot build');
 INSERT INTO squares (square_id,name,image,price,type,rent,rent_database,mortgage,structure_cost,center_x,center_y,special)
 VALUES(16,'Market St.','marketst.png',158,'ORANGE',[14,70,200,550,750],950,76,100,30,246,'');
 INSERT INTO squares (square_id,name,image,price,type,rent,rent_database,mortgage,structure_cost,center_x,center_y,special)

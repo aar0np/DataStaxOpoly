@@ -14,8 +14,9 @@ public class CassandraConnection {
         try {
         	cqlSession = CqlSession.builder()
                 .withAuthCredentials("cassandra", "cassandra")
+//                .addContactPoints(endpointList)
                 .withKeyspace("datastaxopoly")
-                .withLocalDatacenter("datacenter1")
+                .withLocalDatacenter("ClockworkAngels")
                 .build();
 
         	System.out.println("[OK] Success");
