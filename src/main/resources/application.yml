@@ -11,6 +11,7 @@ spring:
   data:
     cassandra:
       schema-action: NONE
+      consistency-level: ONE
 
 astra:
   api:

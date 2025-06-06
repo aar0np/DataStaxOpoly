@@ -182,29 +182,33 @@ public class DataStaxOpolyController {
 		dataLayer.closeGame(gameId);
 	}
 	
-	public void payRent(UUID gameId, UUID playerId, UUID ownerId, int squareId) {
+	public String payRent(UUID gameId, UUID playerId, UUID ownerId, int squareId) {
 		Optional<Property> propertyOpt = dataLayer.getGameProperty(gameId, squareId);
 		Optional<Player> playerOpt = dataLayer.getPlayer(gameId, playerId);
 		Optional<Player> ownerOpt = dataLayer.getPlayer(gameId, ownerId);
 		if (propertyOpt.isPresent() && playerOpt.isPresent() && ownerOpt.isPresent()) {
 			Property property = propertyOpt.get();
-			Player player = playerOpt.get();
-			Player owner = ownerOpt.get();
+			//Player player = playerOpt.get();
+			//Player owner = ownerOpt.get();
 			
 			List<Integer> rentList = property.getRent();
 			
 			int numHouses = 0;
 			// here is where we would query the number of houses on the property
 			int rent = rentList.get(numHouses);
-			int playerCash = player.getCash();
-			int ownerCash = owner.getCash();
-			int newBalance = playerCash - rent;
-			int ownerBalance = ownerCash + rent;
 			
-			// TODO Accord
-			dataLayer.updatePlayerBalance(gameId, playerId, newBalance);
-			dataLayer.updatePlayerBalance(gameId, ownerId, ownerBalance);
+			// Accord
+			String cql = "BEGIN TRANSACTION "
+					+ "UPDATE players SET cash -= " + rent + " WHERE game_id = " + gameId
+					+ " AND player_id = " + playerId + "; "
+					+ "UPDATE players SET cash += " + rent + " WHERE game_id = " + gameId
+					+ " AND player_id = " + ownerId + "; "
+					+ "COMMIT TRANSACTION;";
+			dataLayer.executeAdhocTransaction(cql);
+			
+			return cql;
 		}
+		return "Error: Unable to process rent payment.";
 	}
 	
 	public void buyProperty(UUID gameId, UUID playerId, int squareId) {

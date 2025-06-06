@@ -1,5 +1,5 @@
 CREATE TABLE tokens (
-token_id int PRIMARY KEY.
+token_id int PRIMARY KEY,
 name text);
 
 CREATE TABLE swag_cards (
@@ -38,7 +38,7 @@ mortgage int,
 structure_cost int,
 special text,
 PRIMARY KEY (game_id,square_id)
-);
+) WITH transactional_mode = 'full';
 
 CREATE TABLE community_cards (
 card_id int PRIMARY KEY,
@@ -57,15 +57,16 @@ PRIMARY KEY (game_id,player_id)
 );
 
 CREATE TABLE players (
-game_id UUID,
-player_id UUID,
-name text,
+game_id uuid,
+player_id uuid,
 cash int,
+name text,
+square_id int,
 token_color text,
 token_id int,
-square_id int,
-PRIMARY KEY (game_id,player_id)
-);
+get_out_of_jail_cards map<text, int>,
+PRIMARY KEY (game_id, player_id)
+) WITH transactional_mode = 'full';
 
 CREATE TABLE games (
 game_id UUID PRIMARY KEY,

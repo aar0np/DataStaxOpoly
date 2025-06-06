@@ -3,7 +3,7 @@ INSERT INTO community_cards (card_id,name,type,value,special) VALUES(1,'Sponsori
 INSERT INTO community_cards (card_id,name,type,value,special) VALUES(2,'Bitcoin is up!  Collect $100','CREDIT',100,'');
 INSERT INTO community_cards (card_id,name,type,value,special) VALUES(3,'Stock option sale!','CREDIT',100,'');
 INSERT INTO community_cards (card_id,name,type,value,special) VALUES(4,'Cloud rates go up!  Pay $40 per each server instance, $115 for each database, max of $500.','CHARGE',0,'Compute $40x number of server instances and $110x number of databases, max of $500');
-INSERT INTO community_cards (card_id,name,type,value,special) VALUES(5,'Hosting a meetup.  Pay $100,'CHARGE',100,'');
+INSERT INTO community_cards (card_id,name,type,value,special) VALUES(5,'Hosting a meetup.  Pay $100','CHARGE',100,'');
 INSERT INTO community_cards (card_id,name,type,value,special) VALUES(6,'Bonus cloud credits!  Collect $200','CREDIT',200,'');
 INSERT INTO community_cards (card_id,name,type,value,special) VALUES(7,'2nd Prize in a Hackathon!  Collect $10','CREDIT',10,'');
 INSERT INTO community_cards (card_id,name,type,value,special) VALUES(8,'Stock sale!  Collect $45','CREEDIT',45,'');

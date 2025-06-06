@@ -14,11 +14,11 @@ public class CassandraConnection {
         try {
         	cqlSession = CqlSession.builder()
                 .withAuthCredentials("cassandra", "cassandra")
-//                .addContactPoints(endpointList)
+                .addContactPoint(new InetSocketAddress("127.0.0.1",9042))
                 .withKeyspace("datastaxopoly")
-                .withLocalDatacenter("ClockworkAngels")
+                .withLocalDatacenter("datacenter1")
                 .build();
-
+        	
         	System.out.println("[OK] Success");
         	System.out.printf("[OK] Welcome to Apache Cassandra! Connected to Keyspace %s\n", cqlSession.getKeyspace().get());
         } catch (Exception ex) {

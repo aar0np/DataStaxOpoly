@@ -34,6 +34,7 @@ public class GameDAL {
 	private PreparedStatement getGamePropertyPrepared;
 	private PreparedStatement updatePropertyOwnerCQLPrepared;
 	private PreparedStatement updatePlayerSpacePrepared;
+	private PreparedStatement payRentPrepared;
 	
 	public GameDAL() {
 		this.session = new CassandraConnection().getCqlSession();
@@ -57,7 +58,13 @@ public class GameDAL {
 		String updateCashCQL = "UPDATE players SET cash = ? WHERE game_id = ? AND player_id = ?";
 		String getGamePropertyCQL = "SELECT * FROM properties_by_player WHERE game_id = ? AND square_id = ?";
 		String updatePropertyOwnerCQL = "INSERT INTO properties_by_player (game_id,square_id,player_id) VALUES (?,?,?)";
-		String updatePlayerSpace = "INSERT INTO players (game_id,player_id,square_id) VALUES (?,?,?)";
+		String updatePlayerSpaceCQL = "INSERT INTO players (game_id,player_id,square_id) VALUES (?,?,?)";
+		String payRentCQL = "BEGIN TRANSACTION "
+				+ "UPDATE players SET cash -= ? WHERE game_id = ?"
+				+ " AND player_id = ?; "
+				+ "UPDATE players SET cash += ? WHERE game_id = ?"
+				+ " AND player_id = ?; "
+				+ "COMMIT TRANSACTION;";
 		
 		squareByIdPrepared = session.prepare(squareByIdCQL);
 		communityCardByIdPrepared = session.prepare(communityCardByIdCQL);
@@ -74,7 +81,8 @@ public class GameDAL {
 		updateCashPrepared = session.prepare(updateCashCQL);
 		getGamePropertyPrepared = session.prepare(getGamePropertyCQL);
 		updatePropertyOwnerCQLPrepared = session.prepare(updatePropertyOwnerCQL);
-		updatePlayerSpacePrepared = session.prepare(updatePlayerSpace);
+		updatePlayerSpacePrepared = session.prepare(updatePlayerSpaceCQL);
+		payRentPrepared = session.prepare(payRentCQL);
 	}
 	
 	private void processNewPropertyInserts(BufferedReader fileReader, UUID gameId) {
@@ -192,6 +200,7 @@ public class GameDAL {
 		List<Player> returnVal = new ArrayList<>();
 		
 		BoundStatement getPlayers = playersByGamePrepared.bind(gameId);
+		//getPlayers.setConsistencyLevel(ConsistencyLevel.ONE);
 		ResultSet rSet = session.execute(getPlayers);
 		
 		List<Row> playerData = rSet.all();
@@ -220,6 +229,7 @@ public class GameDAL {
 	public Optional<Player> getPlayer(UUID gameId, UUID playerId) {
 		
 		BoundStatement getPlayer = playerByIdPrepared.bind(gameId,playerId);
+		//getPlayer.setConsistencyLevel(ConsistencyLevel.ONE);
 		ResultSet rSet = session.execute(getPlayer);
 		
 		Row playerData = rSet.one();
@@ -475,5 +485,17 @@ public class GameDAL {
 				gameId, playerId, squareId);
 		
 		session.execute(updatePlayerSpaceStatement);
+	}
+	
+	public void payRent(UUID gameId, UUID playerId, UUID ownerId, int rent) {
+			
+		BoundStatement payRentStatement = payRentPrepared.bind(
+				rent, gameId, playerId, rent, gameId, ownerId);
+		
+		session.execute(payRentStatement);			
+	}
+	
+	public void executeAdhocTransaction(String cql) {
+		session.execute(cql);
 	}
 }

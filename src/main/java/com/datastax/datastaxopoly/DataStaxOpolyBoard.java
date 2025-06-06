@@ -38,7 +38,6 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 	private Map<UUID,String> playerMap = new HashMap<>();
 	private Map<Integer,Square> squares;
 	private Map<UUID,Integer> playerTokenOrdinals = new HashMap<>();
-	//private List<Image> squareImages;
 	private List<UUID> playerIds = new ArrayList<>();
 	
 	// token streams
@@ -64,6 +63,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 	private Image squareImage = new Image();
 	private Grid<Player> playerGrid = new Grid<>(Player.class);
 	private Paragraph statusText = new Paragraph();
+	private Paragraph transactionText = new Paragraph();
 
 	// token icon locations by square
 	private Image goIcon = new Image(whiteSquare, null);
@@ -113,7 +113,6 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 	
 	public DataStaxOpolyBoard() {
 
-//		squareImages = new ArrayList<>();
 		serviceLayer = new DataStaxOpolyController();
 		squares = loadSquares();
 		
@@ -438,6 +437,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		layout.add(playerGrid);
 		layout.add(diceAndRefreshLayout);
 		layout.add(squareImageLayout);
+		layout.add(transactionText);
 		return layout;
 	}
 	
@@ -776,7 +776,10 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 				
 				dialogLayout.add(dialogText);
 				Button okButton = new Button("Ok", event -> {
-					serviceLayer.payRent(gameId, playerId, ownerId, squareId);
+					String cql = serviceLayer.payRent(gameId, playerId, ownerId, squareId)
+							.replace("; ",";\n");
+
+					transactionText.setText(cql);
 					refreshPlayerGrid();
 					dialog.close();
 				});
