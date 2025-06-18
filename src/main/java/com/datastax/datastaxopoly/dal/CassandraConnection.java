@@ -9,14 +9,20 @@ import com.datastax.oss.driver.api.core.CqlSession;
 public class CassandraConnection {
 	private CqlSession cqlSession;
 	
+	private static String USERNAME = System.getenv("CASSANDRA_USERNAME");
+	private static String PASSWORD = System.getenv("CASSANDRA_PASSWORD");
+	private static String ENDPOINT = System.getenv("CASSANDRA_ENDPOINT");
+	private static String KEYSPACE = System.getenv("CASSANDRA_KEYSPACE");
+	private static String DATACENTER = System.getenv("CASSANDRA_DATACENTER");
+	
 	public CassandraConnection() {
         // Connect to open source Apache Cassandra w/ default endpoint and auth
         try {
         	cqlSession = CqlSession.builder()
-                .withAuthCredentials("cassandra", "cassandra")
-                .addContactPoint(new InetSocketAddress("127.0.0.1",9042))
-                .withKeyspace("datastaxopoly")
-                .withLocalDatacenter("datacenter1")
+                .withAuthCredentials(USERNAME, PASSWORD)
+                .addContactPoint(new InetSocketAddress(ENDPOINT,9042))
+                .withKeyspace(KEYSPACE)
+                .withLocalDatacenter(DATACENTER)
                 .build();
         	
         	System.out.println("[OK] Success");
