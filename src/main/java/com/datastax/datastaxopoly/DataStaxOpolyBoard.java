@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.datastax.datastaxopoly.dal.Card;
 import com.datastax.datastaxopoly.dal.Player;
 import com.datastax.datastaxopoly.dal.Property;
 import com.datastax.datastaxopoly.dal.Square;
@@ -38,6 +39,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 	private Map<UUID,String> playerMap = new HashMap<>();
 	private Map<Integer,Square> squares;
 	private Map<UUID,Integer> playerTokenOrdinals = new HashMap<>();
+	private Map<UUID,String> skipTurnMap = new HashMap<>();
 	private List<UUID> playerIds = new ArrayList<>();
 	
 	// token streams
@@ -64,6 +66,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 	private Grid<Player> playerGrid = new Grid<>(Player.class);
 	private Paragraph statusText = new Paragraph();
 	private Paragraph transactionText = new Paragraph();
+	private Paragraph ownerText = new Paragraph();
 
 	// token icon locations by square
 	private Image goIcon = new Image(whiteSquare, null);
@@ -249,7 +252,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		middle.add(topRow);
 		
 		StreamResource boardResource = new StreamResource("",
-				() -> getClass().getResourceAsStream("/images/board.png"));
+				() -> getClass().getResourceAsStream("/images/board_ibm.png"));
 		Image boardImage = new Image(boardResource,"");
 		boardImage.getStyle().set("border", "1px solid Black");
 		middle.add(boardImage);
@@ -335,6 +338,12 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		// build status bar
 		statusText.setWidth("600px");
 		statusText.setHeight("100px");
+		statusText.getStyle().set("border", "1px solid Black");
+		statusText.getStyle().set("padding-left", "10px");
+		//statusText.getStyle().set("margin-top", "-40px");
+		statusText.getStyle().set("margin-left", "100px");
+		transactionText.getStyle().set("padding-right", "10px");
+		statusText.getStyle().set("white-space", "pre-line");
 		layout.add(statusText);
 		
 		return layout;
@@ -402,17 +411,65 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		playerGrid.setAllRowsVisible(true);
 		
 		// build dice roller
-		VerticalLayout diceLayout = new VerticalLayout();
+		VerticalLayout diceControls = new VerticalLayout();
+		HorizontalLayout diceLayout = new HorizontalLayout();
+		Paragraph die0 = new Paragraph();
+		Paragraph die1 = new Paragraph();
+		Paragraph diePlus = new Paragraph("+");
+		Paragraph dieEquals = new Paragraph("=");
 		Paragraph diceResult = new Paragraph();
-		Button rollDiceButton = new Button("Roll Dice", event -> {
+		
+		die0.getStyle().set("border", "1px solid Black");
+		die0.getStyle().set("padding-left", "6px");
+		die0.getStyle().set("padding-right", "6px");
+		die0.setHeight("25px");
+		die1.getStyle().set("border", "1px solid Black");
+		die1.getStyle().set("padding-left", "6px");
+		die1.getStyle().set("padding-right", "6px");
+		die1.setHeight("25px");
+		diceResult.getStyle().set("font-weight", "bold");
+		diceResult.getStyle().set("font-size", "36px");
+		diceResult.getStyle().set("margin-top", "-8px");
+		
+		Button rollDiceButton = new Button("Roll Dice", rollEvent -> {
+			if (skipPlayer(currentPlayerId)) {
+				
+				Dialog skipDialog = new Dialog();
+				skipDialog.setHeaderTitle("SKIP TURN!");
+				Paragraph skipDialogText = new Paragraph("You are skipping your turn");
+				
+				VerticalLayout skipDialogLayout = new VerticalLayout();
+				skipDialogLayout.add(skipDialogText);
+				Button okButton = new Button("OK", skipEvent -> {
+					skipDialog.close();
+				});
+				skipDialogLayout.add(okButton);
+				skipDialog.add(skipDialogLayout);
+				
+				skipDialog.open();
+				
+				statusText.setText("You are skipping your turn.");
+				removeFromSkipTurn(currentPlayerId);
+				setNextPlayer();
+				return;
+			}
+			
 			int[] resultArray = serviceLayer.rollDice();
+			die0.setText(resultArray[0] + "");
+			die1.setText(resultArray[1] + "");
 			Integer result = resultArray[0] + resultArray[1];
 			diceResult.setText(result.toString());
 			moveToken(resultArray);
 		});
 
-		diceLayout.add(rollDiceButton);
+		diceLayout.add(die0);
+		diceLayout.add(diePlus);
+		diceLayout.add(die1);
+		diceLayout.add(dieEquals);
 		diceLayout.add(diceResult);
+		
+		diceControls.add(rollDiceButton);
+		diceControls.add(diceLayout);
 		
 		// build refresh button
 		VerticalLayout refreshLayout = new VerticalLayout();
@@ -423,7 +480,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		refreshLayout.add(refreshButton);
 
 		HorizontalLayout diceAndRefreshLayout = new HorizontalLayout();
-		diceAndRefreshLayout.add(diceLayout);
+		diceAndRefreshLayout.add(diceControls);
 		diceAndRefreshLayout.add(refreshLayout);
 
 		// build square image
@@ -436,7 +493,16 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		// add to layout and return
 		layout.add(playerGrid);
 		layout.add(diceAndRefreshLayout);
+		layout.add(ownerText);
 		layout.add(squareImageLayout);
+		
+		transactionText.getStyle().set("white-space", "pre-line");
+		transactionText.getStyle().set("border", "1px solid Black");
+		transactionText.getStyle().set("margin-left", "-100px");
+		transactionText.getStyle().set("margin-top", "1px");
+		transactionText.getStyle().set("padding-left", "10px");
+		transactionText.getStyle().set("padding-right", "10px");
+		transactionText.setWidth("500px");
 		layout.add(transactionText);
 		return layout;
 	}
@@ -663,18 +729,8 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 			Square square = squares.get(newSquarePosition);
 			player.setSquareId(newSquarePosition);
 			
-			// remove token from old square/space
-			setSpaceIcon(whiteSquare, squarePosition);
-			
-			// draw token on new square/space
-			StreamResource token = getToken(player.getTokenId());
-			setSpaceIcon(token, newSquarePosition);
-			
-			// show square image
-			StreamResource resource = new StreamResource(square.getImage(),
-					() -> getClass().getResourceAsStream("/fullSizeImages/" + square.getImage()));
-			squareImage.setSrc(resource);
-			squareImage.setAlt(playerName);
+			adjustSquareAndTokenGraphics(squarePosition, newSquarePosition,
+					square.getImage(), player.getTokenId(), playerName);
 			
 			statusText.setText(playerName + " rolled a " + result.toString() 
 				+ " and moved to " + square.getName() + ".");
@@ -683,6 +739,22 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 			refreshPlayerGrid();
 			setNextPlayer();
 		}
+	}
+	
+	private void adjustSquareAndTokenGraphics(int squareId, int newSquareId,
+			String squareImageFile,	int playerTokenId, String playerName) {
+		// remove token from old square/space
+		setSpaceIcon(whiteSquare, squareId);
+		
+		// draw token on new square/space
+		StreamResource token = getToken(playerTokenId);
+		setSpaceIcon(token, newSquareId);
+		
+		// show square image
+		StreamResource resource = new StreamResource(squareImageFile,
+				() -> getClass().getResourceAsStream("/fullSizeImages/" + squareImageFile));
+		squareImage.setSrc(resource);
+		squareImage.setAlt(playerName);
 	}
 	
 	private void passGo() {
@@ -724,8 +796,30 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		
 		switch (type) {
 		case "REST":
+			// Check for Skip Turn square
+			if (square.getSquareId() == 38) {
+				addToSkipTurn(playerId,"skip");
+			}
+			// Could also be Hibernated Database square, which is a rest square
 			break;
 		case "CARD":
+			// generate a random card 0-15
+			int cardIndex = (int) (Math.random() * 16);
+			Optional<Card> drawnCard = null;
+			StringBuilder deck = new StringBuilder();
+			if (property.getName().contains("SWAG")) {
+				drawnCard = serviceLayer.drawSwagCard(cardIndex);
+				deck.append("SWAG");
+			} else {
+				drawnCard = serviceLayer.drawCommunityCard(cardIndex);
+				deck.append("Community Forum");
+			}
+			
+			if (drawnCard.isEmpty()) {
+				statusText.setText("No cards available.");
+				return;
+			}
+			processCard(drawnCard, playerId, deck.toString());
 			break;
 		case "CHARGE":
 			break;
@@ -743,7 +837,8 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 				Dialog dialog = new Dialog();
 				VerticalLayout dialogLayout = new VerticalLayout();
 				Paragraph dialogText = new Paragraph();
-
+				ownerText.setText("");
+				
 				dialog.setHeaderTitle("Buy Property");
 				dialogText.setText("Do you want to buy " + name + " for $" + property.getPrice() + "?");
 				
@@ -751,6 +846,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 				Button yesButton = new Button("Yes", event -> {
 
 					serviceLayer.buyProperty(gameId, playerId, squareId);
+					refreshPlayerGrid();
 					dialog.close();
 				});
 				Button noButton = new Button("No", event -> {
@@ -768,16 +864,20 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 				Dialog dialog = new Dialog();
 				VerticalLayout dialogLayout = new VerticalLayout();
 				Paragraph dialogText = new Paragraph();
-
+				ownerText.setText("Owner: " + playerMap.get(ownerId));
+				
 				dialog.setHeaderTitle("Pay Rent!");
 				dialogText.setText("You (" + playerMap.get(playerId)
-						+ ") landed on " + name + " owned by " + playerMap.get(ownerId)
-						+ ". You owe them $" + rent + ".");
+						+ ") landed on " + name + ", owned by " + playerMap.get(ownerId)
+						+ ". You owe " + playerMap.get(ownerId) + " $" + rent + ".");
 				
 				dialogLayout.add(dialogText);
 				Button okButton = new Button("Ok", event -> {
 					String cql = serviceLayer.payRent(gameId, playerId, ownerId, squareId)
-							.replace("; ",";\n");
+							.replace("; ",";\n")
+							.replace(" WHERE","\nWHERE")
+							.replace(" AND","\nAND")
+							.replace("ACTION ","ACTION\n");
 
 					transactionText.setText(cql);
 					refreshPlayerGrid();
@@ -787,11 +887,100 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 				
 				dialog.add(dialogLayout);
 				dialog.open();
+			} else {
+				// property is owned by the current player
+				ownerText.setText("Owner: " + playerMap.get(ownerId));
 			}
 			break;
 		}
 	}
 	
+	private void processCard(Optional<Card> drawnCard, UUID playerId, String deck) {
+
+		Dialog cardDialog = new Dialog();
+		VerticalLayout cardDialogLayout = new VerticalLayout();
+		Paragraph cardDialogText = new Paragraph();
+
+		Optional<Player> playerOpt = serviceLayer.getPlayer(gameId, playerId);
+		
+		if (playerOpt.isPresent()) {
+			// display the card
+			Card card = drawnCard.get();
+			Player player = playerOpt.get();
+			
+			cardDialog.setHeaderTitle("Draw a " + deck + " Card");
+			cardDialogText.setText(player.getName() + " - " + card.getName());
+			
+			cardDialogLayout.add(cardDialogText);
+			Button okButton = new Button("OK", event -> {
+				cardDialog.close();
+			});
+			cardDialogLayout.add(okButton);
+			cardDialog.add(cardDialogLayout);
+			
+			cardDialog.open();
+			// process the card
+			switch (card.getType()) {
+			case "MOVE":
+				if (card.getSpecial() != null && !card.getSpecial().isEmpty()) {
+					// parse the special field
+					if (card.getSpecial().contains("back 3 spaces")) {
+						int newSquareId = player.getSquareId() - 3;
+						Square square = squares.get(newSquareId);
+						
+						if (newSquareId == 0) {
+							// player landed on GO
+							passGo();
+						}
+						
+						adjustSquareAndTokenGraphics(player.getSquareId(), newSquareId,
+								square.getImage(), player.getTokenId(), player.getName());
+						player.setSquareId(newSquareId);
+						processSquare(square);
+					} else if (card.getSpecial().contains("square=")) {
+						String special = card.getSpecial();
+						int newSquareId = Integer.parseInt(special.substring(special.indexOf("=") + 1));
+						Square square = squares.get(newSquareId);
+						
+						if (newSquareId < player.getSquareId()) {
+							// player passed GO
+							passGo();
+						}
+						
+						adjustSquareAndTokenGraphics(player.getSquareId(), newSquareId,
+								square.getImage(), player.getTokenId(), player.getName());
+						player.setSquareId(newSquareId);
+						processSquare(square);
+					}
+					serviceLayer.moveBoardPlayer(
+							gameId, player.getPlayerId(), player.getSquareId());
+				}
+				break;
+			case "CHARGE":
+				if (card.getSpecial() != null && !card.getSpecial().isEmpty()) {
+					// charge a player with a multiplier
+					
+				} else {
+					int amount = card.getValue() * -1;
+					serviceLayer.processSimpleCardTransaction(
+							gameId, player.getPlayerId(), player.getCash(), amount);
+				}
+				break;
+			case "CREDIT":
+				if (card.getSpecial() != null && !card.getSpecial().isEmpty()) {
+					// charge a player with a multiplier
+				} else {
+					serviceLayer.processSimpleCardTransaction(
+						gameId, player.getPlayerId(), player.getCash(), card.getValue());
+				}
+				break;
+			default:
+				// HOLD
+				break;
+			}
+		}
+	}
+
 	private void setNextPlayer() {
 		
 		List<Player> players = serviceLayer.getPlayers(gameId).get();
@@ -825,9 +1014,7 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		
 		if (player.isPresent()) {
 			statusText.setText(statusText.getText()
-					+ System.lineSeparator()
-					+ System.lineSeparator()
-					+ "It is now " + player.get().getName() + "'s turn.");
+					+ "\n\nIt is now " + player.get().getName() + "'s turn.");
 		}
 	}
 	
@@ -835,5 +1022,29 @@ public class DataStaxOpolyBoard extends HorizontalLayout implements HasUrlParame
 		if (!playerIds.contains(playerId)) {
 			playerIds.add(playerId);
 		}
+	}
+	
+	private void addToSkipTurn(UUID playerId, String action) {
+		skipTurnMap.put(playerId, action);
+	}
+	
+	private boolean skipPlayer(UUID playerId) {
+		return skipTurnMap.containsKey(playerId);
+	}
+	
+	private void removeFromSkipTurn(UUID playerId) {
+		skipTurnMap.remove(playerId);
+	}
+	
+	private void goToJail(UUID playerId, String name) {
+		serviceLayer.addPlayerToJail(gameId, playerId, name);
+	}
+	
+	private boolean isPlayerInJail(UUID playerId) {
+		return serviceLayer.IsPlayerInJail(gameId, playerId);
+	}
+	
+	private void getOutOfJail(UUID playerId) {
+		serviceLayer.getOutOfJail(gameId, playerId);
 	}
 }

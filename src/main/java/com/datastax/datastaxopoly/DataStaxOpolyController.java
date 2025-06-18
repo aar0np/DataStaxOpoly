@@ -3,6 +3,7 @@ package com.datastax.datastaxopoly;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Random;
@@ -75,15 +76,15 @@ public class DataStaxOpolyController {
 	}
 	
 	@GetMapping("communitycard/card/{cardid}")
-	public Optional<Card> getCommunityCard(@PathVariable(value="cardid") int cardid) {
+	public Optional<Card> drawCommunityCard(@PathVariable(value="cardid") int cardid) {
 		
 		return dataLayer.getCommunityCard(cardid);
 	}
 
 	@GetMapping("swagcard/card/{cardid}")
-	public Card getSwagCard(@PathVariable(value="cardid") int cardid) {
+	public Optional<Card> drawSwagCard(@PathVariable(value="cardid") int cardid) {
 		
-		return dataLayer.getSwagCard(cardid).get();
+		return dataLayer.getSwagCard(cardid);
 	}
 	
 	@GetMapping("game/rolldice")
@@ -148,6 +149,24 @@ public class DataStaxOpolyController {
 		return dataLayer.getPlayers(gameId);
 	}
 	
+	public boolean IsPlayerInJail(UUID gameId, UUID playerId) {
+		return dataLayer.getJailPlayer(gameId, playerId).isPresent();
+	}
+	
+	public void addPlayerToJail(UUID gameId, UUID playerId, String jailName) {
+		Jail jailPlayer = new Jail();
+		jailPlayer.setGameId(gameId);
+		jailPlayer.setPlayerId(playerId);
+		jailPlayer.setName(jailName);
+		jailPlayer.setTurnsRemainingInJail(3);
+		
+		dataLayer.insertJailPlayer(jailPlayer);
+	}
+	
+	public void getOutOfJail(UUID gameId, UUID playerId) {
+		dataLayer.deleteJailPlayer(gameId, playerId);
+	}
+	
 	public Optional<Property> getProperty(UUID gameId, int squareId) {
 		return dataLayer.getGameProperty(gameId, squareId);
 	}
@@ -188,8 +207,6 @@ public class DataStaxOpolyController {
 		Optional<Player> ownerOpt = dataLayer.getPlayer(gameId, ownerId);
 		if (propertyOpt.isPresent() && playerOpt.isPresent() && ownerOpt.isPresent()) {
 			Property property = propertyOpt.get();
-			//Player player = playerOpt.get();
-			//Player owner = ownerOpt.get();
 			
 			List<Integer> rentList = property.getRent();
 			
@@ -205,10 +222,25 @@ public class DataStaxOpolyController {
 					+ " AND player_id = " + ownerId + "; "
 					+ "COMMIT TRANSACTION;";
 			dataLayer.executeAdhocTransaction(cql);
+			//dataLayer.payRent(gameId, playerId, ownerId, rent);
 			
 			return cql;
 		}
 		return "Error: Unable to process rent payment.";
+	}
+	
+	public void processSimpleCardTransaction(UUID gameId, UUID playerId, int playerCash, int amount) {
+		dataLayer.updatePlayerBalance(gameId, playerId, playerCash + amount);
+	}
+	
+	public String processCardTransactionWMultiplier(UUID gameId, UUID playerId, int amount,
+			int multiplier, Map<UUID,String> playerMap) {
+		Optional<Player> player = dataLayer.getPlayer(gameId, playerId);
+		
+		if (player.isPresent()) {
+
+		}
+		return "Error: Unable to process card transaction.";
 	}
 	
 	public void buyProperty(UUID gameId, UUID playerId, int squareId) {

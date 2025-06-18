@@ -25,6 +25,9 @@ public class GameDAL {
 	private PreparedStatement playerByIdPrepared;
 	private PreparedStatement playersByGamePrepared;
 	private PreparedStatement jailOccupantsByGameIdPrepared;
+	private PreparedStatement jailOccupantPrepared;
+	private PreparedStatement addPlayerToJailPrepared;
+	private PreparedStatement deletePlayerFromJailPrepared;
 	private PreparedStatement gameByIdPrepared;
 	private PreparedStatement newGamePrepared;
 	private PreparedStatement loginPrepared;
@@ -41,6 +44,12 @@ public class GameDAL {
 		prepareStatements();
 	}
 	
+	private void reconnect() {
+		if (session == null || session.isClosed()) {
+			session = new CassandraConnection().getCqlSession();
+		}
+	}
+	
 	private void prepareStatements() {
 		
 		String squareByIdCQL = "SELECT * FROM squares WHERE square_id = ?";
@@ -50,6 +59,10 @@ public class GameDAL {
 		String playerByIdCQL = "SELECT * FROM players WHERE game_id = ? AND player_id = ?";
 		String playersByGameCQL = "SELECT * FROM players WHERE game_id = ?";
 		String jailOccupantsByGameIdCQL = "SELECT * FROM jail WHERE game_id = ?";
+		String getJailOccupantCQL = "SELECT * FROM jail WHERE game_id = ? AND player_id = ?";
+		String addPlayerToJail = "INSERT INTO jail (game_id, player_id, name, turns_remaining_in_jail) "
+				+ "VALUES (?, ?, ?, ?)";
+		String deletePlayerFromJail = "DELETE FROM jail WHERE game_id = ? AND player_id = ?";
 		String gamesByIdCQL = "SELECT * FROM games WHERE game_id = ?";
 		String newGameCQL = "INSERT INTO games (game_id,game_name,active,accepting_players) VALUES (?,?,true,true)";
 		String loginCQL = "SELECT * FROM player_login WHERE player_name = ?";
@@ -73,6 +86,9 @@ public class GameDAL {
 		playerByIdPrepared = session.prepare(playerByIdCQL);
 		playersByGamePrepared = session.prepare(playersByGameCQL);
 		jailOccupantsByGameIdPrepared = session.prepare(jailOccupantsByGameIdCQL);
+		jailOccupantPrepared = session.prepare(getJailOccupantCQL);
+		addPlayerToJailPrepared = session.prepare(addPlayerToJail);
+		deletePlayerFromJailPrepared = session.prepare(deletePlayerFromJail);
 		gameByIdPrepared = session.prepare(gamesByIdCQL);
 		newGamePrepared = session.prepare(newGameCQL);
 		loginPrepared = session.prepare(loginCQL);
@@ -86,6 +102,8 @@ public class GameDAL {
 	}
 	
 	private void processNewPropertyInserts(BufferedReader fileReader, UUID gameId) {
+		
+		reconnect();
 		
 		try {
 			String cqlInsert = fileReader.readLine();
@@ -104,6 +122,8 @@ public class GameDAL {
 
 	private void processNewInserts(BufferedReader fileReader) {
 		
+		reconnect();
+		
 		try {
 			
 			String cqlInsert = fileReader.readLine();
@@ -120,6 +140,9 @@ public class GameDAL {
 	}
 	
 	public UUID newGame(String name) {
+		
+		reconnect();
+		
 		UUID gameId = UUID.randomUUID();
 		
 		// add bank as a player
@@ -170,6 +193,8 @@ public class GameDAL {
 	
 	public Optional<List<Jail>> getJailOccupants(UUID gameId) {
 		
+		reconnect();
+		
 		BoundStatement getJail = jailOccupantsByGameIdPrepared.bind(gameId);
 		ResultSet rSet = session.execute(getJail);
 		
@@ -196,7 +221,49 @@ public class GameDAL {
 		return Optional.ofNullable(null);
 	}
 	
+	public Optional<Jail> getJailPlayer(UUID gameId, UUID playerId) {
+		
+		reconnect();
+		
+		BoundStatement getJailPlayer = jailOccupantPrepared.bind(gameId, playerId);
+		ResultSet rSet = session.execute(getJailPlayer);
+		
+		Row inmateData = rSet.one();
+		
+		if (inmateData != null) {
+			Jail inmate = new Jail();
+			
+			inmate.setGameId(gameId);
+			inmate.setPlayerId(playerId);
+			inmate.setName(inmateData.getString("name"));
+			inmate.setTurnsRemainingInJail(inmateData.getInt("turns_remaining_in_jail"));
+			
+			return Optional.of(inmate);
+		}
+		
+		return Optional.ofNullable(null);
+	}
+	
+	public void insertJailPlayer(Jail jailPlayer) {
+		reconnect();
+		
+		BoundStatement addPlayerToJail = addPlayerToJailPrepared.bind(
+				jailPlayer.getGameId(), jailPlayer.getPlayerId(), jailPlayer.getName(),
+				jailPlayer.getTurnsRemainingInJail());
+		session.execute(addPlayerToJail);
+	}
+	
+	public void deleteJailPlayer(UUID gameId, UUID playerId) {
+		reconnect();
+		
+		BoundStatement deletePlayerFromJail = deletePlayerFromJailPrepared.bind(gameId, playerId);
+		session.execute(deletePlayerFromJail);
+	}
+	
 	public Optional<List<Player>> getPlayers(UUID gameId) {
+		
+		reconnect();
+		
 		List<Player> returnVal = new ArrayList<>();
 		
 		BoundStatement getPlayers = playersByGamePrepared.bind(gameId);
@@ -228,6 +295,8 @@ public class GameDAL {
 	
 	public Optional<Player> getPlayer(UUID gameId, UUID playerId) {
 		
+		reconnect();
+		
 		BoundStatement getPlayer = playerByIdPrepared.bind(gameId,playerId);
 		//getPlayer.setConsistencyLevel(ConsistencyLevel.ONE);
 		ResultSet rSet = session.execute(getPlayer);
@@ -254,6 +323,8 @@ public class GameDAL {
 	}
 	
 	public Optional<Square> getSquare(int squareId) {
+		
+		reconnect();
 		
 		BoundStatement getSquare = squareByIdPrepared.bind(squareId);
 		ResultSet rSet = session.execute(getSquare);
@@ -285,6 +356,8 @@ public class GameDAL {
 	
 	public Optional<Card> getCommunityCard(int cardId) {
 		
+		reconnect();
+		
 		BoundStatement getCard = communityCardByIdPrepared.bind(cardId);
 		ResultSet rSet = session.execute(getCard);
 		
@@ -306,6 +379,8 @@ public class GameDAL {
 	}
 	
 	public Optional<Card> getSwagCard(int cardId) {
+		
+		reconnect();
 		
 		BoundStatement getCard = swagCardByIdPrepared.bind(cardId);
 		ResultSet rSet = session.execute(getCard);
@@ -329,6 +404,8 @@ public class GameDAL {
 	
 	public Optional<Token> getToken(int tokenId) {
 		
+		reconnect();
+		
 		BoundStatement getToken = tokenByIdPrepared.bind(tokenId);
 		ResultSet rSet = session.execute(getToken);
 		
@@ -348,6 +425,8 @@ public class GameDAL {
 	}
 	
 	public Optional<Game> getGame(UUID gameId) {
+		
+		reconnect();
 		
 		BoundStatement getGame = gameByIdPrepared.bind(gameId);
 		ResultSet rSet = session.execute(getGame);
@@ -370,6 +449,8 @@ public class GameDAL {
 
 	public Optional<List<Game>> getGames() {
 
+		reconnect();
+		
 		ResultSet rSet = session.execute("SELECT * FROM games");
 		
 		List<Row> gamesData = rSet.all();
@@ -395,6 +476,8 @@ public class GameDAL {
 	}
 	
 	public Optional<Player> login(String username) {
+		reconnect();
+		
 		BoundStatement getLogin = loginPrepared.bind(username);
 		ResultSet rSet = session.execute(getLogin);
 		
@@ -414,7 +497,8 @@ public class GameDAL {
 	}
 	
 	public void newUser(Player player) {
-				
+		reconnect();
+		
 		BoundStatement postLogin = newLoginPrepared.bind(
 				player.getPlayerId(), player.getName(), player.getPassword());
 		session.execute(postLogin);
@@ -422,6 +506,7 @@ public class GameDAL {
 	
 	public void addNewPlayer(UUID gameId, UUID playerId, String playerName,
 			int tokenId) {
+		reconnect();
 		
 		// INSERT INTO players (game_id,player_id,name,cash,token_id,token_color)
 		BoundStatement playerStatement = addPlayerPrepared.bind(
@@ -430,6 +515,7 @@ public class GameDAL {
 	}
 	
 	public void closeGame(UUID gameId) {
+		reconnect();
 		
 		String closeGameCQL = "UPDATE games SET accepting_players = false WHERE game_id = ?";
 		BoundStatement closeGameStatement = session.prepare(closeGameCQL).bind(gameId);
@@ -438,12 +524,14 @@ public class GameDAL {
 	}
 	
 	public void updatePlayerBalance(UUID gameId, UUID playerId, int amount) {
+		reconnect();
 		
 		BoundStatement payBank = updateCashPrepared.bind(amount, gameId, playerId);
 		session.execute(payBank);
 	}
 	
 	public Optional<Property> getGameProperty(UUID gameId, int squareId) {
+		reconnect();
 		
 		BoundStatement getProperty = getGamePropertyPrepared.bind(gameId, squareId);
 		ResultSet rSet = session.execute(getProperty);
@@ -472,6 +560,7 @@ public class GameDAL {
 	}
 	
 	public void updatePropertyOwner(UUID gameId, int squareId, UUID playerId) {
+		reconnect();
 		
 		BoundStatement updateOwnerStatement = updatePropertyOwnerCQLPrepared.bind(
 				gameId, squareId, playerId);
@@ -480,6 +569,7 @@ public class GameDAL {
 	}
 	
 	public void updatePlayerSpace(UUID gameId, UUID playerId, int squareId) {
+		reconnect();
 		
 		BoundStatement updatePlayerSpaceStatement = updatePlayerSpacePrepared.bind(
 				gameId, playerId, squareId);
@@ -488,14 +578,17 @@ public class GameDAL {
 	}
 	
 	public void payRent(UUID gameId, UUID playerId, UUID ownerId, int rent) {
-			
+		reconnect();
+		
 		BoundStatement payRentStatement = payRentPrepared.bind(
 				rent, gameId, playerId, rent, gameId, ownerId);
 		
-		session.execute(payRentStatement);			
+		session.execute(payRentStatement);
 	}
 	
 	public void executeAdhocTransaction(String cql) {
+		reconnect();
+		
 		session.execute(cql);
-	}
+	}	
 }
